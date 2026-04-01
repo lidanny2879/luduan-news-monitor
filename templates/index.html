@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luduan Global News Monitor - 甪端全球新闻大数据监测平台</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2/dist/echarts-wordcloud.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<style>
+:root {
+  --bg-primary: #0b0e17;
+  --bg-secondary: #111627;
+  --bg-card: #161b2e;
+  --bg-card-hover: #1c2340;
+  --bg-input: #1a2035;
+  --border: #242d48;
+  --text-primary: #e8eaf0;
+  --text-secondary: #8892b0;
+  --text-muted: #5a6480;
+  --accent-blue: #4c8dff;
+  --accent-cyan: #22d3ee;
+  --accent-green: #34d399;
+  --accent-red: #f87171;
+  --accent-yellow: #fbbf24;
+  --accent-purple: #a78bfa;
+  --accent-orange: #fb923c;
+  --gradient-blue: linear-gradient(135deg, #4c8dff 0%, #22d3ee 100%);
+  --gradient-green: linear-gradient(135deg, #34d399 0%, #22d3ee 100%);
+  --gradient-red: linear-gradient(135deg, #f87171 0%, #fb923c 100%);
+  --gradient-purple: linear-gradient(135deg, #a78bfa 0%, #4c8dff 100%);
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* Header */
+.header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+.header-left { display:flex; align-items:center; gap:16px; }
+.logo {
+  width:40px; height:40px; border-radius:10px;
+  overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.logo img {
+  width:100%; height:100%; object-fit:cover;
+}
+.header h1 { font-size:20px; font-weight:600; letter-spacing:-0.3px; }
+.header h1 span { color:var(--accent-blue); }
+.header-right { display:flex; align-items:center; gap:12px; }
+.status-dot { width:8px; height:8px; border-radius:50%; background:var(--accent-green); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+.last-update { color:var(--text-muted); font-size:13px; }
+.btn {
+  padding:8px 16px; border-radius:8px; border:1px solid var(--border);
+  background:var(--bg-card); color:var(--text-primary); cursor:pointer;
+  font-size:13px; transition:all .2s;
+}
+.btn:hover { background:var(--bg-card-hover); border-color:var(--accent-blue); }
+.btn-primary { background:var(--accent-blue); border-color:var(--accent-blue); color:white; }
+.btn-primary:hover { opacity:0.9; }
+.btn-sm { padding:4px 10px; font-size:12px; }
+
+/* Layout */
+.container { max-width:1600px; margin:0 auto; padding:24px; }
+
+/* Global Control Bar */
+.control-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 24px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.control-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-weight: 500;
+}
+.time-range-btns {
+  display: flex;
+  gap: 4px;
+}
+.time-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.time-btn:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+.time-btn.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: white;
+}
+
+/* Keyword Search Panel */
+.keyword-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+.keyword-panel .card-title { margin-bottom: 16px; }
+.keyword-search-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.keyword-input-group {
+  flex: 1;
+  min-width: 300px;
+}
+.keyword-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s;
+}
+.keyword-input:focus { border-color: var(--accent-blue); }
+.keyword-input::placeholder { color: var(--text-muted); }
+.keyword-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.keyword-results {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.keyword-result-card {
+  flex: 1;
+  min-width: 160px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  transition: all .3s;
+}
+.keyword-result-card:hover { border-color: var(--accent-blue); }
+.kw-result-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.kw-result-value { font-size: 28px; font-weight: 700; color: var(--accent-cyan); }
+.kw-result-value.positive { color: var(--accent-green); }
+.kw-result-value.negative { color: var(--accent-red); }
+.kw-result-value.neutral { color: var(--accent-yellow); }
+.kw-result-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.keyword-breakdown {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.keyword-breakdown-chart { height: 250px; }
+
+/* Stats Cards */
+.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.stat-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px 24px; position:relative; overflow:hidden; transition:all .3s;
+}
+.stat-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); border-color:var(--accent-blue); }
+.stat-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+}
+.stat-card:nth-child(1)::before { background:var(--gradient-blue); }
+.stat-card:nth-child(2)::before { background:var(--gradient-green); }
+.stat-card:nth-child(3)::before { background:var(--gradient-purple); }
+.stat-card:nth-child(4)::before { background:var(--gradient-red); }
+.stat-label { font-size:13px; color:var(--text-secondary); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; }
+.stat-value { font-size:32px; font-weight:700; letter-spacing:-1px; }
+.stat-sub { font-size:12px; color:var(--text-muted); margin-top:4px; }
+.stat-card:nth-child(1) .stat-value { color:var(--accent-blue); }
+.stat-card:nth-child(2) .stat-value { color:var(--accent-green); }
+.stat-card:nth-child(3) .stat-value { color:var(--accent-purple); }
+.stat-card:nth-child(4) .stat-value { color:var(--accent-yellow); }
+
+/* Chart Cards */
+.chart-row { display:grid; gap:16px; margin-bottom:24px; }
+.chart-row-2 { grid-template-columns:1fr 1fr; }
+.chart-row-3 { grid-template-columns:2fr 1fr; }
+.card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px; transition:all .3s;
+}
+.card:hover { box-shadow:var(--shadow); }
+.card-title {
+  font-size:15px; font-weight:600; margin-bottom:16px;
+  display:flex; align-items:center; gap:8px;
+}
+.card-title .dot { width:8px; height:8px; border-radius:50%; }
+.chart-container { width:100%; height:350px; }
+.chart-container-sm { height:300px; }
+
+/* Article Table */
+.table-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px; }
+.filters { display:flex; gap:8px; flex-wrap:wrap; }
+.filter-input {
+  background:var(--bg-input); border:1px solid var(--border); border-radius:8px;
+  padding:8px 14px; color:var(--text-primary); font-size:13px; outline:none;
+  transition:border-color .2s;
+}
+.filter-input:focus { border-color:var(--accent-blue); }
+.filter-input::placeholder { color:var(--text-muted); }
+select.filter-input { cursor:pointer; }
+
+.article-table { width:100%; border-collapse:collapse; }
+.article-table th {
+  text-align:left; padding:10px 12px; font-size:12px; color:var(--text-secondary);
+  text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border);
+  font-weight:500; white-space:nowrap;
+}
+.article-table td {
+  padding:12px; border-bottom:1px solid rgba(36,45,72,0.5); font-size:13px;
+  vertical-align:middle;
+}
+.article-table tr:hover td { background:var(--bg-card-hover); }
+.article-title {
+  color:var(--accent-blue); text-decoration:none; font-weight:500;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden; max-width:400px;
+}
+.article-title:hover { text-decoration:underline; }
+.badge {
+  display:inline-block; padding:2px 8px; border-radius:4px;
+  font-size:11px; font-weight:600; text-transform:uppercase;
+}
+.badge-positive { background:rgba(52,211,153,0.15); color:var(--accent-green); }
+.badge-negative { background:rgba(248,113,113,0.15); color:var(--accent-red); }
+.badge-neutral { background:rgba(136,146,176,0.15); color:var(--text-secondary); }
+.badge-source {
+  padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500;
+}
+.badge-gdelt { background:rgba(76,141,255,0.15); color:var(--accent-blue); }
+.badge-google_news { background:rgba(251,191,36,0.15); color:var(--accent-yellow); }
+.badge-mediacloud { background:rgba(167,139,250,0.15); color:var(--accent-purple); }
+
+.pagination {
+  display:flex; align-items:center; justify-content:center; gap:8px; margin-top:16px;
+}
+.page-info { color:var(--text-muted); font-size:13px; }
+
+/* Loading */
+.loading-overlay {
+  display:flex; align-items:center; justify-content:center;
+  height:200px; color:var(--text-muted);
+}
+.spinner {
+  width:32px; height:32px; border:3px solid var(--border);
+  border-top-color:var(--accent-blue); border-radius:50%;
+  animation:spin 0.8s linear infinite; margin-right:12px;
+}
+@keyframes spin { to{transform:rotate(360deg);} }
+
+/* Responsive */
+@media (max-width:1024px) {
+  .stats-row { grid-template-columns:repeat(2,1fr); }
+  .chart-row-2, .chart-row-3 { grid-template-columns:1fr; }
+  .keyword-breakdown { grid-template-columns:1fr; }
+}
+@media (max-width:600px) {
+  .stats-row { grid-template-columns:1fr; }
+  .header { padding:12px 16px; flex-wrap:wrap; gap:8px; }
+  .container { padding:12px; }
+  .control-bar { flex-direction:column; align-items:stretch; }
+  .time-range-btns { flex-wrap:wrap; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo"><img src="/static/luduan_logo.png" alt="甪端"></div>
+      <h1><span>Luduan</span> Global News Monitor</h1>
+    </div>
+    <div class="header-right">
+      <div class="status-dot"></div>
+      <span class="last-update">{{ lastUpdate ? '最后更新: ' + lastUpdate : '加载中...' }}</span>
+      <button class="btn" @click="fetchAll">刷新数据</button>
+      <button class="btn btn-sm" @click="triggerFetch('gdelt')">抓取 GDELT</button>
+      <button class="btn btn-sm" @click="triggerFetch('google_news')">抓取 Google</button>
+      <button class="btn btn-sm" @click="triggerFetch('analysis')">运行分析</button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- Global Time Range Control -->
+    <div class="control-bar">
+      <div class="control-group">
+        <span class="control-label">时间范围:</span>
+        <div class="time-range-btns">
+          <button v-for="r in timeRanges" :key="r.value"
+            class="time-btn" :class="{active: globalDays===r.value}"
+            @click="setGlobalDays(r.value)">{{ r.label }}</button>
+        </div>
+      </div>
+      <div class="control-group" style="margin-left:auto;">
+        <span class="control-label">数据源:</span>
+        <select class="filter-input" v-model="globalSource" @change="onGlobalFilterChange" style="padding:6px 12px;">
+          <option value="">全部</option>
+          <option value="gdelt">GDELT</option>
+          <option value="google_news">Google News</option>
+          <option value="mediacloud">Media Cloud</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Keyword Search Panel -->
+    <div class="keyword-panel">
+      <div class="card-title"><span class="dot" style="background:var(--accent-cyan)"></span>关键词监测 Keyword Monitor</div>
+      <div class="keyword-search-row">
+        <div class="keyword-input-group">
+          <input class="keyword-input" v-model="kwInput"
+            @keydown.enter="searchKeyword"
+            placeholder="输入关键词，多个用逗号分隔（如: 沈阳, shenyang, 瀋陽）">
+          <div class="keyword-hint">支持多语种关键词，逗号分隔同时搜索，结果取并集。按 Enter 或点击搜索。</div>
+        </div>
+        <button class="btn btn-primary" @click="searchKeyword" :disabled="kwSearching" style="height:42px;padding:0 24px;">
+          {{ kwSearching ? '搜索中...' : '搜索' }}
+        </button>
+        <button class="btn" @click="liveKeywordFetch" :disabled="kwFetching" style="height:42px;padding:0 20px;border-color:var(--accent-cyan);color:var(--accent-cyan);">
+          {{ kwFetching ? '抓取中...' : '实时抓取' }}
+        </button>
+      </div>
+      <div v-if="kwFetchStatus" style="margin-top:10px;padding:8px 14px;background:var(--bg-primary);border-radius:8px;font-size:12px;color:var(--accent-green);border:1px solid var(--border);">
+        {{ kwFetchStatus }}
+      </div>
+
+      <!-- Keyword Results -->
+      <div v-if="kwResult" class="keyword-results">
+        <div class="keyword-result-card">
+          <div class="kw-result-label">匹配文章总数</div>
+          <div class="kw-result-value">{{ formatNum(kwResult.total) }}</div>
+          <div class="kw-result-sub">时间范围: {{ currentRangeLabel }}</div>
+        </div>
+        <div class="keyword-result-card">
+          <div class="kw-result-label">正面报道</div>
+          <div class="kw-result-value positive">{{ formatNum(kwResult.sentiment.positive) }}</div>
+          <div class="kw-result-sub">{{ kwResult.total ? ((kwResult.sentiment.positive/kwResult.total*100).toFixed(1)+'%') : '0%' }}</div>
+        </div>
+        <div class="keyword-result-card">
+          <div class="kw-result-label">中性报道</div>
+          <div class="kw-result-value neutral">{{ formatNum(kwResult.sentiment.neutral) }}</div>
+          <div class="kw-result-sub">{{ kwResult.total ? ((kwResult.sentiment.neutral/kwResult.total*100).toFixed(1)+'%') : '0%' }}</div>
+        </div>
+        <div class="keyword-result-card">
+          <div class="kw-result-label">负面报道</div>
+          <div class="kw-result-value negative">{{ formatNum(kwResult.sentiment.negative) }}</div>
+          <div class="kw-result-sub">{{ kwResult.total ? ((kwResult.sentiment.negative/kwResult.total*100).toFixed(1)+'%') : '0%' }}</div>
+        </div>
+        <div class="keyword-result-card">
+          <div class="kw-result-label">涉及数据源</div>
+          <div class="kw-result-value" style="font-size:22px;color:var(--accent-purple);">{{ Object.keys(kwResult.by_source||{}).length }}</div>
+          <div class="kw-result-sub">
+            <span v-for="(v,k) in (kwResult.by_source||{})" :key="k" style="margin-right:6px;">{{ sourceLabel(k) }}: {{ v }}</span>
+          </div>
+        </div>
+        <div class="keyword-result-card">
+          <div class="kw-result-label">涉及国家/地区</div>
+          <div class="kw-result-value" style="font-size:22px;color:var(--accent-orange);">{{ Object.keys(kwResult.by_country||{}).length }}</div>
+          <div class="kw-result-sub">
+            <span v-for="(v,k) in (kwResult.by_country||{})" :key="k" style="margin-right:6px;">{{ k }}: {{ v }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Keyword Trend + Source Breakdown Charts -->
+      <div v-if="kwResult && kwResult.total > 0" class="keyword-breakdown">
+        <div class="card" style="padding:16px;">
+          <div class="card-title" style="font-size:13px;margin-bottom:8px;"><span class="dot" style="background:var(--accent-cyan)"></span>关键词趋势 Keyword Trend</div>
+          <div class="keyword-breakdown-chart" id="kwTrendChart"></div>
+        </div>
+        <div class="card" style="padding:16px;">
+          <div class="card-title" style="font-size:13px;margin-bottom:8px;"><span class="dot" style="background:var(--accent-orange)"></span>来源分布 Source Breakdown</div>
+          <div class="keyword-breakdown-chart" id="kwSourceChart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">总文章数</div>
+        <div class="stat-value">{{ formatNum(stats.total_articles) }}</div>
+        <div class="stat-sub">全部数据源累计</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">{{ currentRangeLabel }}新增</div>
+        <div class="stat-value">{{ formatNum(stats.articles_in_range) }}</div>
+        <div class="stat-sub">当前时间范围内</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">活跃数据源</div>
+        <div class="stat-value">{{ Object.keys(stats.source_counts || {}).length }}</div>
+        <div class="stat-sub">
+          <span v-for="(v,k) in (stats.source_counts||{})" :key="k" style="margin-right:8px;">
+            {{ k }}: {{ formatNum(v) }}
+          </span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">平均情感值</div>
+        <div class="stat-value">{{ stats.avg_sentiment >= 0 ? '+' : '' }}{{ (stats.avg_sentiment||0).toFixed(3) }}</div>
+        <div class="stat-sub">
+          <span style="color:var(--accent-green)">正面 {{ formatNum((stats.sentiment_distribution||{}).positive||0) }}</span> /
+          <span style="color:var(--text-muted)">中性 {{ formatNum((stats.sentiment_distribution||{}).neutral||0) }}</span> /
+          <span style="color:var(--accent-red)">负面 {{ formatNum((stats.sentiment_distribution||{}).negative||0) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trend + Sentiment Charts -->
+    <div class="chart-row chart-row-2">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--accent-blue)"></span>文章趋势 Article Volume Trends</div>
+        <div class="chart-container" id="trendChart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--accent-green)"></span>情感分布 Sentiment Distribution</div>
+        <div class="chart-container" id="sentimentChart"></div>
+      </div>
+    </div>
+
+    <!-- Topics + WordCloud -->
+    <div class="chart-row chart-row-3">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--accent-purple)"></span>热门话题 Topic Clusters</div>
+        <div class="chart-container" id="topicChart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--accent-cyan)"></span>关键词云 Word Cloud</div>
+        <div class="chart-container" id="wordcloudChart"></div>
+      </div>
+    </div>
+
+    <!-- Source Distribution + Country -->
+    <div class="chart-row chart-row-2">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--accent-orange)"></span>数据源分布 Source Distribution</div>
+        <div class="chart-container chart-container-sm" id="sourceChart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--accent-yellow)"></span>国家/地区分布 Country Distribution</div>
+        <div class="chart-container chart-container-sm" id="countryChart"></div>
+      </div>
+    </div>
+
+    <!-- Article Table -->
+    <div class="card">
+      <div class="table-header">
+        <div class="card-title" style="margin-bottom:0"><span class="dot" style="background:var(--accent-blue)"></span>最新文章 Latest Articles</div>
+        <div class="filters">
+          <input class="filter-input" v-model="filters.query" @input="debounceFetchArticles" placeholder="搜索标题..." style="width:200px;">
+          <select class="filter-input" v-model="filters.source" @change="fetchArticles">
+            <option value="">全部数据源</option>
+            <option value="gdelt">GDELT</option>
+            <option value="google_news">Google News</option>
+            <option value="mediacloud">Media Cloud</option>
+          </select>
+        </div>
+      </div>
+
+      <div v-if="articlesLoading" class="loading-overlay">
+        <div class="spinner"></div>加载中...
+      </div>
+      <div v-else style="overflow-x:auto;">
+        <table class="article-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>标题</th>
+              <th>媒体</th>
+              <th>国家</th>
+              <th>情感</th>
+              <th>数据源</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="a in articles" :key="a.id">
+              <td style="white-space:nowrap;color:var(--text-muted);">{{ formatDate(a.published_at) }}</td>
+              <td><a class="article-title" :href="a.url" target="_blank">{{ a.title }}</a></td>
+              <td style="color:var(--text-secondary);white-space:nowrap;">{{ a.source_name || '-' }}</td>
+              <td>{{ a.country || '-' }}</td>
+              <td>
+                <span class="badge" :class="'badge-'+(a.sentiment_label||'neutral')">
+                  {{ a.sentiment_label || '-' }}
+                </span>
+              </td>
+              <td>
+                <span class="badge badge-source" :class="'badge-'+a.source">{{ sourceLabel(a.source) }}</span>
+              </td>
+            </tr>
+            <tr v-if="articles.length===0">
+              <td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">暂无数据，等待首次抓取...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination" v-if="articleTotal > 0">
+        <button class="btn btn-sm" :disabled="filters.page<=1" @click="filters.page--;fetchArticles()">上一页</button>
+        <span class="page-info">第 {{ filters.page }} / {{ Math.ceil(articleTotal/filters.size) }} 页 (共 {{ formatNum(articleTotal) }} 条)</span>
+        <button class="btn btn-sm" :disabled="filters.page>=Math.ceil(articleTotal/filters.size)" @click="filters.page++;fetchArticles()">下一页</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+const COLORS = {
+  gdelt: '#4c8dff',
+  google_news: '#fbbf24',
+  mediacloud: '#a78bfa',
+};
+
+createApp({
+  data() {
+    return {
+      stats: {},
+      trends: {},
+      sentimentData: {},
+      topics: [],
+      keywords: [],
+      articles: [],
+      articleTotal: 0,
+      articlesLoading: false,
+      lastUpdate: null,
+
+      // Global time range
+      globalDays: 30,
+      globalSource: '',
+      timeRanges: [
+        { label: '1天', value: 1 },
+        { label: '3天', value: 3 },
+        { label: '7天', value: 7 },
+        { label: '30天', value: 30 },
+        { label: '3个月', value: 90 },
+        { label: '半年', value: 180 },
+        { label: '1年', value: 365 },
+      ],
+
+      // Keyword search
+      kwInput: '',
+      kwResult: null,
+      kwSearching: false,
+      kwFetching: false,
+      kwFetchStatus: '',
+
+      // Article table
+      filters: { query: '', source: '', page: 1, size: 20 },
+      charts: {},
+      debounceTimer: null,
+    };
+  },
+  computed: {
+    currentRangeLabel() {
+      const r = this.timeRanges.find(t => t.value === this.globalDays);
+      return r ? r.label : this.globalDays + '天';
+    },
+  },
+  mounted() {
+    this.fetchAll();
+    setInterval(() => this.fetchAll(), 300000);
+  },
+  methods: {
+    formatNum(n) {
+      if (n == null) return '0';
+      return Number(n).toLocaleString();
+    },
+    formatDate(d) {
+      if (!d) return '-';
+      const dt = new Date(d);
+      return dt.toLocaleDateString('zh-CN', { month:'2-digit', day:'2-digit' }) + ' ' +
+             dt.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' });
+    },
+    sourceLabel(s) {
+      return { gdelt:'GDELT', google_news:'Google', mediacloud:'MediaCloud' }[s] || s;
+    },
+
+    setGlobalDays(days) {
+      this.globalDays = days;
+      this.onGlobalFilterChange();
+    },
+    onGlobalFilterChange() {
+      this.filters.source = this.globalSource;
+      this.filters.page = 1;
+      this.fetchAll();
+      if (this.kwResult) this.searchKeyword();
+    },
+
+    async fetchAll() {
+      try {
+        const d = this.globalDays;
+        const src = this.globalSource;
+        const srcParam = src ? `&source=${src}` : '';
+        const [stats, trends, sentiment, topics, wordcloud] = await Promise.all([
+          axios.get(`/api/stats?days=${d}${srcParam}`),
+          axios.get(`/api/trends?days=${d}`),
+          axios.get(`/api/sentiment?days=${d}`),
+          axios.get('/api/topics'),
+          axios.get(`/api/wordcloud?days=${Math.min(d, 90)}`),
+        ]);
+        this.stats = stats.data;
+        this.trends = trends.data.trends;
+        this.sentimentData = sentiment.data.sentiment;
+        this.topics = topics.data.topics;
+        this.keywords = wordcloud.data.keywords;
+        this.lastUpdate = new Date().toLocaleTimeString('zh-CN');
+        await this.fetchArticles();
+        this.$nextTick(() => {
+          this.renderTrendChart();
+          this.renderSentimentChart();
+          this.renderTopicChart();
+          this.renderWordCloud();
+          this.renderSourceChart();
+          this.renderCountryChart();
+        });
+      } catch (e) {
+        console.error('Fetch error:', e);
+      }
+    },
+
+    async fetchArticles() {
+      this.articlesLoading = true;
+      try {
+        const params = {
+          page: this.filters.page, size: this.filters.size, days: this.globalDays,
+        };
+        if (this.filters.source || this.globalSource) params.source = this.filters.source || this.globalSource;
+        if (this.filters.query) params.query = this.filters.query;
+        const res = await axios.get('/api/articles', { params });
+        this.articles = res.data.articles;
+        this.articleTotal = res.data.total;
+      } catch (e) { console.error(e); }
+      this.articlesLoading = false;
+    },
+    debounceFetchArticles() {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = setTimeout(() => { this.filters.page=1; this.fetchArticles(); }, 400);
+    },
+
+    async searchKeyword() {
+      const kw = this.kwInput.trim();
+      if (!kw) return;
+      this.kwSearching = true;
+      try {
+        const res = await axios.get('/api/keyword_search', {
+          params: { keywords: kw, days: this.globalDays }
+        });
+        this.kwResult = res.data;
+        this.$nextTick(() => {
+          this.renderKwTrendChart();
+          this.renderKwSourceChart();
+        });
+      } catch (e) { console.error(e); }
+      this.kwSearching = false;
+    },
+
+    async liveKeywordFetch() {
+      const kw = this.kwInput.trim();
+      if (!kw) return;
+      this.kwFetching = true;
+      this.kwFetchStatus = '正在从 GDELT / Google News / MediaCloud 实时抓取 "' + kw + '" 相关新闻...';
+      try {
+        const res = await axios.post('/api/keyword_fetch?keywords=' + encodeURIComponent(kw));
+        const f = res.data.fetched || {};
+        const parts = [];
+        if (typeof f.gdelt === 'number') parts.push('GDELT: ' + f.gdelt + '条');
+        if (typeof f.google_news === 'number') parts.push('Google: ' + f.google_news + '条');
+        if (typeof f.mediacloud === 'number') parts.push('MediaCloud: ' + f.mediacloud + '条');
+        this.kwFetchStatus = '抓取完成! ' + parts.join(', ') + '。正在运行情感分析...';
+        // Wait for analysis to process, then re-search
+        await new Promise(r => setTimeout(r, 5000));
+        await this.searchKeyword();
+        this.kwFetchStatus = '抓取并分析完成! ' + parts.join(', ');
+        setTimeout(() => { this.kwFetchStatus = ''; }, 8000);
+      } catch (e) {
+        this.kwFetchStatus = '抓取出错: ' + (e.response?.data?.detail || e.message);
+        console.error(e);
+      }
+      this.kwFetching = false;
+    },
+
+    async triggerFetch(source) {
+      try {
+        await axios.post('/api/fetch/' + source);
+        setTimeout(() => this.fetchAll(), 5000);
+      } catch (e) { console.error(e); }
+    },
+
+    // --- Charts ---
+    _init(id) {
+      if (this.charts[id]) this.charts[id].dispose();
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const c = echarts.init(el, 'dark');
+      this.charts[id] = c;
+      window.addEventListener('resize', () => c.resize());
+      return c;
+    },
+
+    renderTrendChart() {
+      const c = this._init('trendChart');
+      if (!c) return;
+      const dates = Object.keys(this.trends).sort();
+      const sources = ['gdelt', 'google_news', 'mediacloud'];
+      const series = sources.map(s => ({
+        name: this.sourceLabel(s),
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 },
+        areaStyle: { opacity: 0.08 },
+        itemStyle: { color: COLORS[s] },
+        data: dates.map(d => (this.trends[d]?.[s]?.count) || 0),
+      }));
+      c.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis' },
+        legend: { data: sources.map(s => this.sourceLabel(s)), top: 0, textStyle: { color: '#8892b0' } },
+        grid: { left: 50, right: 20, top: 40, bottom: 30 },
+        xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: '#242d48' } }, axisLabel: { color: '#5a6480', fontSize: 11 } },
+        yAxis: { type: 'value', splitLine: { lineStyle: { color: '#1c2340' } }, axisLabel: { color: '#5a6480' } },
+        series,
+      });
+    },
+
+    renderSentimentChart() {
+      const c = this._init('sentimentChart');
+      if (!c) return;
+      const dates = Object.keys(this.sentimentData).sort();
+      const makeS = (name, key, color) => ({
+        name, type: 'bar', stack: 'total', barWidth: '60%',
+        itemStyle: { color, borderRadius: key==='positive' ? [2,2,0,0] : key==='negative' ? [0,0,2,2] : 0 },
+        data: dates.map(d => this.sentimentData[d]?.[key] || 0),
+      });
+      c.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['正面','中性','负面'], top: 0, textStyle: { color: '#8892b0' } },
+        grid: { left: 50, right: 20, top: 40, bottom: 30 },
+        xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: '#242d48' } }, axisLabel: { color: '#5a6480', fontSize: 11 } },
+        yAxis: { type: 'value', splitLine: { lineStyle: { color: '#1c2340' } }, axisLabel: { color: '#5a6480' } },
+        series: [
+          makeS('正面', 'positive', '#34d399'),
+          makeS('中性', 'neutral', '#4a5568'),
+          makeS('负面', 'negative', '#f87171'),
+        ],
+      });
+    },
+
+    renderTopicChart() {
+      const c = this._init('topicChart');
+      if (!c) return;
+      const topics = (this.topics || []).slice(0, 15).reverse();
+      c.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis', formatter: p => {
+          const d = p[0]; const t = this.topics.slice(0,15).reverse()[d.dataIndex];
+          return `<b>${d.name}</b><br/>文章数: ${d.value}<br/>关键词: ${(t?.keywords||[]).join(', ')}`;
+        }},
+        grid: { left: 120, right: 30, top: 10, bottom: 20 },
+        xAxis: { type: 'value', splitLine: { lineStyle: { color: '#1c2340' } }, axisLabel: { color: '#5a6480' } },
+        yAxis: { type: 'category', data: topics.map(t => t.label), axisLabel: { color: '#e8eaf0', fontSize: 12 } },
+        series: [{
+          type: 'bar', barWidth: '60%',
+          data: topics.map((t, i) => ({
+            value: t.article_count,
+            itemStyle: { color: new echarts.graphic.LinearGradient(0,0,1,0, [
+              { offset:0, color: '#4c8dff' }, { offset:1, color: '#22d3ee' }
+            ]), borderRadius: [0,4,4,0] },
+          })),
+        }],
+      });
+    },
+
+    renderWordCloud() {
+      const c = this._init('wordcloudChart');
+      if (!c) return;
+      const kws = (this.keywords || []).slice(0, 80);
+      if (kws.length === 0) {
+        c.setOption({ backgroundColor: 'transparent', title: { text: '等待数据...', left:'center', top:'center', textStyle:{color:'#5a6480',fontSize:14} } });
+        return;
+      }
+      c.setOption({
+        backgroundColor: 'transparent',
+        series: [{
+          type: 'wordCloud',
+          shape: 'circle',
+          sizeRange: [14, 56],
+          rotationRange: [-30, 30],
+          gridSize: 8,
+          textStyle: {
+            fontFamily: '-apple-system, sans-serif',
+            fontWeight: '600',
+            color: () => {
+              const colors = ['#4c8dff','#22d3ee','#34d399','#a78bfa','#fbbf24','#fb923c','#f87171'];
+              return colors[Math.floor(Math.random()*colors.length)];
+            },
+          },
+          data: kws,
+        }],
+      });
+    },
+
+    renderSourceChart() {
+      const c = this._init('sourceChart');
+      if (!c) return;
+      const sc = this.stats.source_counts || {};
+      c.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        series: [{
+          type: 'pie', radius: ['45%','75%'], center: ['50%','55%'],
+          avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 6, borderColor: '#161b2e', borderWidth: 2 },
+          label: { color: '#e8eaf0', fontSize: 13 },
+          emphasis: { label: { fontSize: 16, fontWeight: 'bold' } },
+          data: Object.entries(sc).map(([k,v]) => ({
+            name: this.sourceLabel(k), value: v, itemStyle: { color: COLORS[k] || '#4c8dff' },
+          })),
+        }],
+      });
+    },
+
+    renderCountryChart() {
+      const c = this._init('countryChart');
+      if (!c) return;
+      const cc = this.stats.country_counts || {};
+      const entries = Object.entries(cc).sort((a,b) => b[1]-a[1]).slice(0, 10);
+      const colors = ['#4c8dff','#22d3ee','#34d399','#a78bfa','#fbbf24','#fb923c','#f87171','#e879f9','#60a5fa','#818cf8'];
+      c.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        series: [{
+          type: 'pie', radius: ['45%','75%'], center: ['50%','55%'],
+          roseType: 'area',
+          itemStyle: { borderRadius: 6, borderColor: '#161b2e', borderWidth: 2 },
+          label: { color: '#e8eaf0', fontSize: 12 },
+          data: entries.map(([k,v], i) => ({ name: k||'Unknown', value: v, itemStyle: { color: colors[i%colors.length] } })),
+        }],
+      });
+    },
+
+    renderKwTrendChart() {
+      const c = this._init('kwTrendChart');
+      if (!c || !this.kwResult?.daily_trend) return;
+      const trend = this.kwResult.daily_trend;
+      const dates = Object.keys(trend).sort();
+      c.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'axis' },
+        grid: { left: 40, right: 16, top: 10, bottom: 24 },
+        xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: '#242d48' } }, axisLabel: { color: '#5a6480', fontSize: 10 } },
+        yAxis: { type: 'value', splitLine: { lineStyle: { color: '#1c2340' } }, axisLabel: { color: '#5a6480' } },
+        series: [{
+          type: 'line', smooth: true, symbol: 'circle', symbolSize: 5,
+          lineStyle: { width: 2, color: '#22d3ee' },
+          areaStyle: { opacity: 0.15, color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#22d3ee'},{offset:1,color:'transparent'}]) },
+          itemStyle: { color: '#22d3ee' },
+          data: dates.map(d => trend[d]),
+        }],
+      });
+    },
+
+    renderKwSourceChart() {
+      const c = this._init('kwSourceChart');
+      if (!c || !this.kwResult?.by_source) return;
+      const sc = this.kwResult.by_source;
+      c.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        series: [{
+          type: 'pie', radius: ['40%','70%'], center: ['50%','55%'],
+          itemStyle: { borderRadius: 6, borderColor: '#161b2e', borderWidth: 2 },
+          label: { color: '#e8eaf0', fontSize: 12 },
+          data: Object.entries(sc).map(([k,v]) => ({
+            name: this.sourceLabel(k), value: v, itemStyle: { color: COLORS[k] || '#4c8dff' },
+          })),
+        }],
+      });
+    },
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
