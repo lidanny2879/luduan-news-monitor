@@ -258,7 +258,14 @@ def get_articles(
     if country:
         q = q.filter(Article.country == country)
     if query:
-        q = q.filter(Article.title.ilike(f"%{query}%"))
+        from sqlalchemy import or_
+        kw_list = [k.strip() for k in query.split(",") if k.strip()]
+        conditions = []
+        for kw in kw_list:
+            conditions.append(Article.title.ilike(f"%{kw}%"))
+            conditions.append(Article.content_snippet.ilike(f"%{kw}%"))
+            conditions.append(Article.search_keywords.ilike(f"%{kw}%"))
+        q = q.filter(or_(*conditions))
 
     total = q.count()
     articles = q.order_by(desc(Article.published_at)).offset((page - 1) * size).limit(size).all()

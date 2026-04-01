@@ -701,6 +701,10 @@ createApp({
           params: { keywords: kw, days: this.globalDays }
         });
         this.kwResult = res.data;
+        // 联动文章列表：自动筛选相关文章
+        this.filters.query = kw;
+        this.filters.page = 1;
+        await this.fetchArticles();
         this.$nextTick(() => {
           this.renderKwTrendChart();
           this.renderKwSourceChart();
