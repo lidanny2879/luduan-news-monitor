@@ -35,6 +35,10 @@ STOP_WORDS_EN = {
     "global", "market", "markets", "update", "latest", "breaking",
     "million", "billion", "percent", "per", "cent", "amid", "says",
     "could", "may", "state", "government", "international", "official",
+    "his", "her", "their", "end", "april", "march", "june", "july",
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+    "sunday", "today", "know", "want", "think", "tell", "show",
+    "away", "into", "ahead", "high", "low", "left", "right",
 }
 STOP_WORDS_ZH = {
     "的", "了", "在", "是", "和", "与", "对", "为", "中", "年", "月", "日",
