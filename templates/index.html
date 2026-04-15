@@ -330,6 +330,9 @@ select.filter-input { cursor:pointer; }
       <button class="btn btn-sm" @click="triggerFetch('gdelt')">抓取 GDELT</button>
       <button class="btn btn-sm" @click="triggerFetch('google_news')">抓取 Google</button>
       <button class="btn btn-sm" @click="triggerFetch('analysis')">运行分析</button>
+      <button class="btn btn-primary" @click="downloadReport()" :disabled="reportGenerating" style="margin-left:6px;">
+        {{ reportGenerating ? '生成中...' : '📄 生成报告' }}
+      </button>
     </div>
   </header>
 
@@ -371,6 +374,9 @@ select.filter-input { cursor:pointer; }
         </button>
         <button class="btn" @click="liveKeywordFetch" :disabled="kwFetching" style="height:42px;padding:0 20px;border-color:var(--accent-cyan);color:var(--accent-cyan);">
           {{ kwFetching ? '抓取中...' : '实时抓取' }}
+        </button>
+        <button class="btn" @click="downloadReport(true)" :disabled="reportGenerating" style="height:42px;padding:0 20px;border-color:var(--accent-purple);color:var(--accent-purple);">
+          {{ reportGenerating ? '生成中...' : '📄 专题报告' }}
         </button>
       </div>
       <div v-if="kwFetchStatus" style="margin-top:10px;padding:8px 14px;background:var(--bg-primary);border-radius:8px;font-size:12px;color:var(--accent-green);border:1px solid var(--border);">
@@ -599,6 +605,9 @@ createApp({
       kwFetching: false,
       kwFetchStatus: '',
 
+      // Report generation
+      reportGenerating: false,
+
       // Article table
       filters: { query: '', source: '', page: 1, size: 20 },
       charts: {},
@@ -743,6 +752,50 @@ createApp({
         await axios.post('/api/fetch/' + source);
         setTimeout(() => this.fetchAll(), 5000);
       } catch (e) { console.error(e); }
+    },
+
+    async downloadReport(useKeywords = false) {
+      if (this.reportGenerating) return;
+      this.reportGenerating = true;
+      try {
+        const params = { days: this.globalDays };
+        if (useKeywords) {
+          const kw = this.kwInput.trim();
+          if (!kw) {
+            alert('请先输入关键词');
+            this.reportGenerating = false;
+            return;
+          }
+          params.keywords = kw;
+        }
+        const res = await axios.get('/api/generate_report', {
+          params,
+          responseType: 'blob',
+          timeout: 120000,
+        });
+        // 从响应头解析文件名
+        let fname = '新闻监测报告.docx';
+        const cd = res.headers['content-disposition'];
+        if (cd) {
+          const m = cd.match(/filename\*=UTF-8''([^;]+)/);
+          if (m) { try { fname = decodeURIComponent(m[1]); } catch(e){} }
+        }
+        const blob = new Blob([res.data], {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error(e);
+        alert('报告生成失败: ' + (e.response?.data?.error || e.message));
+      }
+      this.reportGenerating = false;
     },
 
     // --- Charts ---

@@ -6,8 +6,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Query, Depends
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from urllib.parse import quote
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -22,6 +23,7 @@ from analyzer import (
     extract_keywords,
     run_full_analysis,
 )
+from report_generator import generate_report
 from fetchers.base import make_url_hash
 
 logging.basicConfig(
@@ -503,6 +505,45 @@ def get_sources(db: Session = Depends(_get_db)):
             for r in rows
         ]
     }
+
+
+@app.get("/api/generate_report")
+def generate_report_endpoint(
+    days: int = Query(30, ge=1, le=365),
+    keywords: str = Query(None, description="可选关键词, 逗号分隔. 提供时生成专题报告"),
+    db: Session = Depends(_get_db),
+):
+    """生成 DOCX 格式舆情监测报告 (党政公文格式)."""
+    kw_list = None
+    if keywords:
+        kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
+        if not kw_list:
+            kw_list = None
+
+    try:
+        docx_bytes = generate_report(db, days=days, keywords=kw_list)
+    except Exception as e:
+        logger.error(f"Report generation failed: {e}", exc_info=True)
+        return JSONResponse({"error": f"报告生成失败: {e}"}, status_code=500)
+
+    # 构造文件名 (包含关键词与日期)
+    ts = datetime.now().strftime("%Y%m%d_%H%M")
+    if kw_list:
+        kw_part = "_".join(kw_list)[:40]
+        fname_raw = f"舆情报告_{kw_part}_{ts}.docx"
+    else:
+        fname_raw = f"全球新闻监测报告_{ts}.docx"
+    # RFC 5987 编码以支持中文文件名
+    fname_encoded = quote(fname_raw)
+
+    return Response(
+        content=docx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": f"attachment; filename=report.docx; filename*=UTF-8''{fname_encoded}",
+            "Content-Length": str(len(docx_bytes)),
+        },
+    )
 
 
 @app.post("/api/fetch/{source}")
